@@ -73,9 +73,9 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
     static final String ZALENIUM_SCREEN_WIDTH = "ZALENIUM_SCREEN_WIDTH";
     @VisibleForTesting
     static final String ZALENIUM_SCREEN_HEIGHT = "ZALENIUM_SCREEN_HEIGHT";
-    @VisibleForTesting
+    private static final String ZALENIUM_SEND_ANONYMOUS_USAGE_INFO = "ZALENIUM_SEND_ANONYMOUS_USAGE_INFO";
+    private static final boolean DEFAULT_ZALENIUM_SEND_ANONYMOUS_USAGE_INFO = true;
     private static final String DEFAULT_ZALENIUM_CONTAINER_NAME = "zalenium";
-    @VisibleForTesting
     private static final String ZALENIUM_CONTAINER_NAME = "ZALENIUM_CONTAINER_NAME";
     private static final Logger LOGGER = Logger.getLogger(DockerSeleniumStarterRemoteProxy.class.getName());
     private static final String DEFAULT_DOCKER_SELENIUM_IMAGE = "elgalu/selenium";
@@ -98,6 +98,7 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
     private static int firefoxContainersOnStartup;
     private static int maxDockerSeleniumContainers;
     private static int sleepIntervalMultiplier = 1000;
+    private static boolean configuredSendAnonymousUsageInfo = DEFAULT_ZALENIUM_SEND_ANONYMOUS_USAGE_INFO;
     private static TimeZone configuredTimeZone;
     private static Dimension configuredScreenSize;
     private static String containerName;
@@ -138,6 +139,9 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
 
         String seleniumImageName = env.getStringEnvVariable(ZALENIUM_SELENIUM_IMAGE_NAME, DEFAULT_DOCKER_SELENIUM_IMAGE);
         setDockerSeleniumImageName(seleniumImageName);
+
+        configuredSendAnonymousUsageInfo =
+                env.getBooleanEnvVariable(ZALENIUM_SEND_ANONYMOUS_USAGE_INFO, DEFAULT_ZALENIUM_SEND_ANONYMOUS_USAGE_INFO);
     }
 
     /*
@@ -400,7 +404,6 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
             NetworkUtils networkUtils = new NetworkUtils();
             String hostIpAddress = networkUtils.getIp4NonLoopbackAddressOfThisMachine().getHostAddress();
 
-            boolean sendAnonymousUsageInfo = env.getBooleanEnvVariable("ZALENIUM_SEND_ANONYMOUS_USAGE_INFO", false);
             String nodePolling = String.valueOf(RandomUtils.nextInt(90, 120) * 1000);
 
             int attempts = 0;
@@ -409,8 +412,8 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
                 attempts++;
                 final int nodePort = findFreePortInRange(LOWER_PORT_BOUNDARY, UPPER_PORT_BOUNDARY);
 
-                Map<String, String> envVars = buildEnvVars(browser, screenSize, timeZone, hostIpAddress,
-                        sendAnonymousUsageInfo, nodePolling, nodePort);
+                Map<String, String> envVars = buildEnvVars(browser, screenSize, timeZone, hostIpAddress, nodePolling,
+                        nodePort);
 
                 String latestImage = containerClient.getLatestDownloadedImage(getDockerSeleniumImageName());
                 boolean containerCreated = containerClient
@@ -462,8 +465,7 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
     }
 
     private Map<String, String> buildEnvVars(String browser, Dimension screenSize, TimeZone timeZone,
-                                             String hostIpAddress, boolean sendAnonymousUsageInfo, String nodePolling,
-                                             int nodePort) {
+                                             String hostIpAddress, String nodePolling, int nodePort) {
         final int noVncPort = nodePort + NO_VNC_PORT_GAP;
         final int vncPort = nodePort + VNC_PORT_GAP;
         Map<String, String> envVars = new HashMap<>();
@@ -476,7 +478,7 @@ public class DockerSeleniumStarterRemoteProxy extends DefaultRemoteProxy impleme
         envVars.put("PICK_ALL_RANDOM_PORTS", "false");
         envVars.put("VIDEO_STOP_SLEEP_SECS", "1");
         envVars.put("WAIT_TIME_OUT_VIDEO_STOP", "20s");
-        envVars.put("SEND_ANONYMOUS_USAGE_INFO", String.valueOf(sendAnonymousUsageInfo));
+        envVars.put("SEND_ANONYMOUS_USAGE_INFO", String.valueOf(configuredSendAnonymousUsageInfo));
         envVars.put("BUILD_URL", env.getStringEnvVariable("BUILD_URL", ""));
         envVars.put("NOVNC", "true");
         envVars.put("NOVNC_PORT", String.valueOf(noVncPort));
